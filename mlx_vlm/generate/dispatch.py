@@ -1294,9 +1294,9 @@ def generate(
         print("=" * 10)
         files = []
         if image is not None:
-            files.extend(image)
+            files.extend(image if isinstance(image, list) else [image])
         if audio is not None:
-            files.extend(audio)
+            files.extend(audio if isinstance(audio, list) else [audio])
         if video is not None:
             files.extend(video if isinstance(video, list) else [video])
 

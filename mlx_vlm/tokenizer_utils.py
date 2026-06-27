@@ -231,10 +231,18 @@ class BPEStreamingDetokenizer(StreamingDetokenizer):
             return
         v = self.tokenmap[token]
         # if the token starts with space
-        if self._byte_decoder[v[0]] == 32:
-            current_text = bytearray(
-                self._byte_decoder[c] for c in self._unflushed
-            ).decode("utf-8")
+        try:
+            starts_with_space = self._byte_decoder[v[0]] == 32
+        except (KeyError, IndexError, TypeError):
+            self._unflushed += v
+            return
+        if starts_with_space:
+            try:
+                current_text = bytearray(
+                    self._byte_decoder[c] for c in self._unflushed
+                ).decode("utf-8")
+            except (KeyError, UnicodeDecodeError):
+                current_text = self._unflushed
             if self.text or not self.trim_space:
                 self.text += current_text
             else:
@@ -450,6 +458,30 @@ def _is_bpe_decoder(decoder):
     return isinstance(decoder, dict) and decoder.get("type", None) == "ByteLevel"
 
 
+def _vocab_uses_byte_level_bpe(vocab):
+    """Check whether vocab tokens use GPT-2 byte-level BPE encoding (Ġ space markers).
+
+    Some tokenizers (e.g. DeepSeek) carry an SPM-style decoder config but were
+    trained with byte-level BPE, so their vocab tokens contain ``Ġ`` (U+0120)
+    instead of ``▁`` (U+2581) for spaces.  The SPM streaming detokenizer cannot
+    handle these, so we detect the mismatch and fall back to the BPE one.
+    """
+    if not vocab:
+        return False
+    g_count = 0
+    checked = 0
+    for token_str in vocab:
+        # Skip special tokens like <|det|>, <｜begin▁of▁sentence｜>, etc.
+        if len(token_str) >= 2 and token_str[0] == "<" and token_str[-1] == ">":
+            continue
+        checked += 1
+        if token_str.startswith("\u0120"):  # Ġ
+            g_count += 1
+        if checked >= 2000:
+            break
+    return checked > 0 and g_count > checked * 0.05
+
+
 def load_tokenizer(model_path, return_tokenizer=True, tokenizer_config_extra={}):
     """Load a huggingface tokenizer and try to infer the type of streaming
     detokenizer to use.
@@ -467,12 +499,22 @@ def load_tokenizer(model_path, return_tokenizer=True, tokenizer_config_extra={})
             except JSONDecodeError as e:
                 raise JSONDecodeError("Failed to parse tokenizer.json", e.doc, e.pos)
 
+        spm_selected = False
         if "decoder" in tokenizer_content:
             if _is_spm_decoder(tokenizer_content["decoder"]):
                 detokenizer_class = SPMStreamingDetokenizer
+                spm_selected = True
             elif _is_spm_decoder_no_space(tokenizer_content["decoder"]):
                 detokenizer_class = partial(SPMStreamingDetokenizer, trim_space=False)
+                spm_selected = True
             elif _is_bpe_decoder(tokenizer_content["decoder"]):
+                detokenizer_class = BPEStreamingDetokenizer
+
+        # Some tokenizers (e.g. DeepSeek OCR) have an SPM-style decoder config but
+        # a byte-level BPE vocab (Ġ-encoded).  Override to BPE in that case.
+        if spm_selected:
+            vocab = tokenizer_content.get("model", {}).get("vocab", {})
+            if _vocab_uses_byte_level_bpe(vocab):
                 detokenizer_class = BPEStreamingDetokenizer
 
     if return_tokenizer:

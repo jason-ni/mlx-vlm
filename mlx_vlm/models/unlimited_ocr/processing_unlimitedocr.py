@@ -129,7 +129,7 @@ class UnlimitedOCRProcessor(DeepseekOCRProcessor):
         conversation: str,
         images: List[Image.Image],
         base_size: int = 1024,
-        image_size: int = 640,
+        image_size: int = 1024,
         cropping: bool = True,
     ):
         patch_size = self.patch_size
