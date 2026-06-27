@@ -4,9 +4,11 @@ The `unlimited_ocr` model is ported to MLX and working.
 
 ## Models
 
-- **bf16**: `/Volumes/Realtek/models/mlx/unlimited-ocr-bf16-mlx` — **best**, output matches PT reference
-- **8-bit**: `/Volumes/Realtek/models/mlx/unlimited-ocr-8bit-mlx` — works but degenerates late
-- **4-bit**: `/Volumes/Realtek/models/mlx/unlimited-ocr-4bit-mlx` — too aggressive quantization, unusable
+- **bf16**: `/Volumes/Realtek/models/mlx/unlimited-ocr-bf16-mlx` — **best**, output matches PT reference, 10.3GB peak
+- **hybrid-8bit**: `/Volumes/Realtek/models/mlx/unlimited-ocr-hybrid-mlx` — bf16 vision + q8 LLM, matches bf16 quality, 7.5GB peak
+- **hybrid-4bit**: `/Volumes/Realtek/models/mlx/unlimited-ocr-hybrid-4bit-mlx` — bf16 vision + q4 LLM, minor text degradation, 6.1GB peak
+- **8-bit** (full): `/Volumes/Realtek/models/mlx/unlimited-ocr-8bit-mlx` — works but degenerates late
+- **4-bit** (full): `/Volumes/Realtek/models/mlx/unlimited-ocr-4bit-mlx` — too aggressive quantization, unusable
 
 ## Usage
 
