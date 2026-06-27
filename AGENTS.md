@@ -10,6 +10,14 @@ The `unlimited_ocr` model is ported to MLX and working.
 - **8-bit** (full): `/Volumes/Realtek/models/mlx/unlimited-ocr-8bit-mlx` — works but degenerates late
 - **4-bit** (full): `/Volumes/Realtek/models/mlx/unlimited-ocr-4bit-mlx` — too aggressive quantization, unusable
 
+### hybrid-4bit known degradation vs hybrid-8bit
+
+- Bbox coordinates drift by 1-2px (semantically irrelevant)
+- Table 2 header drops `\text{}` in LaTeX subscript (`_{\text{BASE}}` → `_{BASE}`)
+- "4.4 Results" section onward: "TFLOP" repeatedly mangled to "TFLOOP" or "TFLO^{P}"
+- `4 \times A100` used instead of `4×A100` (different LaTeX formatting)
+- Text before "4.4 Results" is identical (only bbox drift)
+
 ## Usage
 
 ```bash
