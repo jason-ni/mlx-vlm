@@ -2,6 +2,7 @@
 From https://github.com/deepseek-ai/DeepSeek-VL2
 """
 
+import json
 import math
 from dataclasses import dataclass
 from typing import Dict, List, Literal, Optional, Tuple
@@ -221,6 +222,39 @@ class DeepseekOCRProcessor(ProcessorMixin):
 
         super().__init__(tokenizer, **kwargs)
 
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, **kwargs):
+        kwargs.pop("trust_remote_code", None)
+        kwargs.pop("revision", None)
+        kwargs.pop("force_download", None)
+        from pathlib import Path
+
+        path = Path(pretrained_model_name_or_path)
+        if not path.exists():
+            from huggingface_hub import snapshot_download
+            path = Path(snapshot_download(pretrained_model_name_or_path))
+
+        processor_config = {}
+        processor_config_path = path / "processor_config.json"
+        if processor_config_path.exists():
+            with open(processor_config_path, encoding="utf-8") as f:
+                processor_config = json.load(f)
+        processor_config.pop("processor_class", None)
+        processor_config.update(kwargs)
+
+        # Load tokenizer via raw tokenizers library to avoid
+        # LlamaTokenizerFast.from_pretrained corrupting the BPE model.
+        from tokenizers import Tokenizer
+        from transformers import PreTrainedTokenizerFast
+        raw = Tokenizer.from_file(str(path / "tokenizer.json"))
+        tokenizer = PreTrainedTokenizerFast(
+            tokenizer_object=raw,
+            bos_token="<｜begin▁of▁sentence｜>",
+            eos_token="<｜end▁of▁sentence｜>",
+            unk_token="<unk>",
+        )
+        return cls(tokenizer=tokenizer, **processor_config)
+
         # Add chat template
         self.chat_template = kwargs.pop("chat_template", self.default_chat_template)
 
@@ -380,13 +414,12 @@ class DeepseekOCRProcessor(ProcessorMixin):
                     if cropping:
                         # best_width, best_height = select_best_resolution(image.size, self.candidate_resolutions)
                         images_crop_raw, crop_ratio = dynamic_preprocess(image)
-
                     else:
                         # best_width, best_height = self.image_size, self.image_size
                         crop_ratio = [1, 1]
 
                 """process the global view"""
-                # image = image.resize((base_size, base_size))
+                #image = image.resize((base_size, base_size))
                 global_view = ImageOps.pad(
                     image,
                     (base_size, base_size),

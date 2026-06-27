@@ -1,11 +1,12 @@
 import math
 import json
 from pathlib import Path
-from typing import List
+from typing import Any, List
 
 import mlx.core as mx
 from PIL import Image, ImageOps
-from transformers import LlamaTokenizerFast
+from tokenizers import Tokenizer
+from transformers import PreTrainedTokenizerFast
 
 from ..base import install_auto_processor_patch
 from ..deepseekocr.processing_deepseekocr import (
@@ -17,6 +18,8 @@ from ..deepseekocr.processing_deepseekocr import (
 class UnlimitedOCRProcessor(DeepseekOCRProcessor):
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, **kwargs):
+        import sys as _sys
+        print("DEBUG: UnlimitedOCRProcessor.from_pretrained called", file=_sys.stderr)
         kwargs.pop("trust_remote_code", None)
         kwargs.pop("revision", None)
         kwargs.pop("force_download", None)
@@ -36,12 +39,21 @@ class UnlimitedOCRProcessor(DeepseekOCRProcessor):
 
         processor_config.pop("processor_class", None)
         processor_config.update(kwargs)
-        tokenizer = LlamaTokenizerFast.from_pretrained(path)
+
+        # Load tokenizer via raw tokenizers library to avoid
+        # LlamaTokenizerFast.from_pretrained corrupting the BPE model.
+        raw = Tokenizer.from_file(str(path / "tokenizer.json"))
+        tokenizer = PreTrainedTokenizerFast(
+            tokenizer_object=raw,
+            bos_token="<｜begin▁of▁sentence｜>",
+            eos_token="<｜end▁of▁sentence｜>",
+            unk_token="<unk>",
+        )
         return cls(tokenizer=tokenizer, **processor_config)
 
     def __init__(
         self,
-        tokenizer: LlamaTokenizerFast,
+        tokenizer: Any,
         candidate_resolutions=((1024, 1024),),
         patch_size: int = 16,
         downsample_ratio: int = 4,
@@ -129,7 +141,7 @@ class UnlimitedOCRProcessor(DeepseekOCRProcessor):
         conversation: str,
         images: List[Image.Image],
         base_size: int = 1024,
-        image_size: int = 1024,
+        image_size: int = 640,
         cropping: bool = True,
     ):
         patch_size = self.patch_size
@@ -294,3 +306,5 @@ class UnlimitedOCRProcessor(DeepseekOCRProcessor):
 UnlimitedOCRHFProcessor = UnlimitedOCRProcessor
 
 install_auto_processor_patch("unlimited-ocr", UnlimitedOCRProcessor)
+# Also register for deepseekocr model type since config.json uses model_type=deepseekocr
+install_auto_processor_patch("deepseekocr", UnlimitedOCRProcessor)
