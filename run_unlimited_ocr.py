@@ -27,7 +27,7 @@ def make_no_repeat_ngram(ngram_size=35, window=128, whitelist=frozenset({128815}
     return processor
 
 
-model, processor = load("/Volumes/Realtek/models/mlx/unlimited-ocr-bf16-mlx")
+model, processor = load("/Volumes/Realtek/models/mlx/unlimited-ocr-hybrid-mlx")
 
 response = generate(model, processor,
                     prompt="<image> document parsing.",
